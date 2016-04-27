@@ -1,6 +1,6 @@
 //  ============================================================
 //
-//  Program: ArdCore Template
+//  Program: ArdCore Template Test 3
 //
 //  Description: A template application for the ArdCore A
 //               module from 20 Objects LLC.This sketch acts
@@ -101,14 +101,14 @@ void setup()
   
   // set up the digital outputs
   for (int i=0; i<2; i++) {
-    pinMode(digPin[i], OUTPUT);
-    digitalWrite(digPin[i], LOW);
+	pinMode(digPin[i], OUTPUT);
+	digitalWrite(digPin[i], LOW);
   }
   
   // set up the 8-bit DAC output pins
   for (int i=0; i<8; i++) {
-    pinMode(pinOffset+i, OUTPUT);
-    digitalWrite(pinOffset+i, LOW);
+	pinMode(pinOffset+i, OUTPUT);
+	digitalWrite(pinOffset+i, LOW);
   }
   
   // set up an interrupt handler for the clock in. If you
@@ -123,31 +123,31 @@ void loop()
 {
   // check to see if the clock as been set
   if (clkState == HIGH) {
-    clkState = LOW;
-    
-    digState[0] = HIGH;
-    digMilli[0] = millis();
-    digitalWrite(digPin[0], HIGH);
-    
-    clkDivide++;
-    if (clkDivide > (analogRead(1) >> 6)) {
-      clkDivide = 0;
-      digState[1] = HIGH;
-      digMilli[1] = millis();
-      digitalWrite(digPin[1], HIGH);
-    }
+	clkState = LOW;
+	
+	digState[0] = HIGH;
+	digMilli[0] = millis();
+	digitalWrite(digPin[0], HIGH);
+	
+	clkDivide++;
+	if (clkDivide > (analogRead(1) >> 6)) {
+	  clkDivide = 0;
+	  digState[1] = HIGH;
+	  digMilli[1] = millis();
+	  digitalWrite(digPin[1], HIGH);
+	}
   }
-    
+	
   // output the current analog knob 0 setting as an octave voltage
   int tempOct = analogRead(0) / 171;  // (Gets you 0-6)
   dacOutput(oct[tempOct]);
   
   // do we have to turn off any of the digital outputs?
   for (int i=0; i<2; i++) {
-    if ((digState[i] == HIGH) && (millis() - digMilli[i] > trigTime)) {
-      digState[i] = LOW;
-      digitalWrite(digPin[i], LOW);
-    }
+	if ((digState[i] == HIGH) && (millis() - digMilli[i] > trigTime)) {
+	  digState[i] = LOW;
+	  digitalWrite(digPin[i], LOW);
+	}
   }
   
   // print the analog input values
@@ -188,8 +188,8 @@ void dacOutput(byte v)
   // output will send it out.
   int tmpVal = v;
   for (int i=0; i<8; i++) {
-    digitalWrite(pinOffset + i, tmpVal & 1);
-    tmpVal = tmpVal >> 1;
+	digitalWrite(pinOffset + i, tmpVal & 1);
+	tmpVal = tmpVal >> 1;
   }
   */
   
@@ -208,7 +208,7 @@ int deJitter(int v, int test)
   // change before we bother implementing it. This is useful
   // for cleaning up jittery analog inputs.
   if (abs(v - test) > 8) {
-    return v;
+	return v;
   }
   return test;
 }
