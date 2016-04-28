@@ -24,7 +24,8 @@
 //                             reduce trigger time to 10 ms
 //            19 Feb 2011  ddg Force quantization on clock
 //            17 Apr 2012  ddg Updated for Arduino 1.0
-//						18 Apr 2012	 ddg  Changed dacOutput routine to Alba version
+//			18 Apr 2012	 ddg  Changed dacOutput routine to Alba version
+//			27 Apr 2016	map	Converted to EuroArdCore
 //
 //  ============================================================
 //
@@ -41,6 +42,13 @@
 //  For more information on the Creative Commons CC BY-NC license,
 //  visit http://creativecommons.org/licenses/
 //
+
+
+
+#include <SPI.h>
+#include <DAC_MCP49xx.h>
+DAC_MCP49xx dac(DAC_MCP49xx::MCP4922, 10); // DAC model, SS pin, LDAC pin
+
 //  ================= start of global section ==================
 
 //  constants related to the Arduino Nano pin use
@@ -48,7 +56,7 @@ const int clkIn = 2;           // the digital (clock) input
 const int digPin[2] = {3, 4};  // the digital output pins
 const int pinOffset = 5;       // the first DAC pin (from 5-12)
 
-//  constant for actual 0-5V quantization (vs. >> 4)
+//  constant for actual 0-5V quantization (vs. >> 4) LATER CONVERT
 const int qArray[61] = {
   0,   9,   26,  43,  60,  77,  94,  111, 128, 145, 162, 180, 
   197, 214, 231, 248, 265, 282, 299, 316, 333, 350, 367, 384, 
@@ -78,6 +86,10 @@ int gateDuration = 0;          // the duration of the output gate
 //  Standard setup routine - see ArdCore_Template for info.
 
 void setup() {
+
+	dac.setBuffer(true);
+	dac.setPortWrite(true); //Faster analog outs, but loses pin 7.
+
   Serial.begin(9600);
   
   // set up the digital (clock) input
@@ -85,14 +97,14 @@ void setup() {
   
   // set up the digital outputs
   for (int i=0; i<2; i++) {
-    pinMode(digPin[i], OUTPUT);
-    digitalWrite(digPin[i], LOW);
+	pinMode(digPin[i], OUTPUT);
+	digitalWrite(digPin[i], LOW);
   }
   
   // set up the 8-bit DAC output pins
   for (int i=0; i<8; i++) {
-    pinMode(pinOffset+i, OUTPUT);
-    digitalWrite(pinOffset+i, LOW);
+	pinMode(pinOffset+i, OUTPUT);
+	digitalWrite(pinOffset+i, LOW);
   }
 
   // set up the clock input
@@ -108,57 +120,57 @@ void loop()
   // test for transpose change
   tempval = analogRead(0) / 86;
   if (tempval != transpose) {
-    transpose = tempval;
-    doQuant = 1;
+	transpose = tempval;
+	doQuant = 1;
   }
 
   // test for input change
   tempval = deJitter(analogRead(2), inValue);
   if (tempval != inValue) {
-    inValue = tempval;
-    doQuant = 1;
+	inValue = tempval;
+	doQuant = 1;
   }
   
   // check for suppression
   if (analogRead(3) > 511) {
-    doQuant = 0;
+	doQuant = 0;
   }
 
   // test for clock tick (even if suppressed, we quantize on clock)
   if (clkState == HIGH) {
-    clkState = LOW;
-    doQuant = 1;
+	clkState = LOW;
+	doQuant = 1;
   }
   
   // do the quantization
   if (doQuant) {
 
-    // send the note
-    outValue = quantNote(inValue);
-    if (outValue != oldOut) {
-      dacOutput(outValue);
-      oldOut = outValue;
+	// send the note
+	outValue = quantNote(inValue);
+	if (outValue != oldOut) {
+	  dacOutput(outValue);
+	  oldOut = outValue;
 
-    /*    
-    Serial.print(transpose);
-    Serial.print('\t');
-    Serial.print(inValue);
-    Serial.print('\t');
-    Serial.print(outValue);
-    Serial.print('\t');    
-    Serial.print(doQuant);
-    Serial.println();
-    */
-    
-      // do the triggers and gates
-      for (int i=0; i<2; i++) {
-        digitalWrite(digPin[i], HIGH);
-        digState[i] = HIGH;
-        digMilli[i] = millis();
-      }
-    }
-    
-    doQuant = 0;
+	/*    
+	Serial.print(transpose);
+	Serial.print('\t');
+	Serial.print(inValue);
+	Serial.print('\t');
+	Serial.print(outValue);
+	Serial.print('\t');    
+	Serial.print(doQuant);
+	Serial.println();
+	*/
+	
+	  // do the triggers and gates
+	  for (int i=0; i<2; i++) {
+		digitalWrite(digPin[i], HIGH);
+		digState[i] = HIGH;
+		digMilli[i] = millis();
+	  }
+	}
+	
+	doQuant = 0;
   }
   
   // get the current gate time  
@@ -166,12 +178,12 @@ void loop()
   
   // test for trigger and gate turnoff
   for (int i=0; i<2; i++) {
-    if ((digState[i] == HIGH) && (millis() - digMilli[i] > digTimes[i])) {
-      digitalWrite(digPin[i], LOW);
-      digState[i] = LOW;
-    }
+	if ((digState[i] == HIGH) && (millis() - digMilli[i] > digTimes[i])) {
+	  digitalWrite(digPin[i], LOW);
+	  digState[i] = LOW;
+	}
   }
-    
+	
 }
 
 //  =================== convenience routines ===================
@@ -187,8 +199,13 @@ void isr()
 //  -----------------------------------------
 void dacOutput(byte v)
 {
-  PORTB = (PORTB & B11100000) | (v >> 3);
-  PORTD = (PORTD & B00011111) | ((v & B00000111) << 5);
+  //PORTB = (PORTB & B11100000) | (v >> 3);
+ // PORTD = (PORTD & B00011111) | ((v & B00000111) << 5);
+
+  short out = (v * 16);	//	Scale 8 bits to 12 bits.
+  dac.outputA(out);
+
+
 }
 
 //  deJitter(int, int) - smooth jitter input
@@ -203,7 +220,7 @@ int deJitter(int v, int test)
   // return v;
   
   if (abs(v - test) > 2) {
-    return v;
+	return v;
   }
   return test;
 }
@@ -224,9 +241,9 @@ int vQuant(int v)
   int tmp = 0;
   
   for (int i=0; i<61; i++) {
-    if (v >= qArray[i]) {
-      tmp = i;
-    }
+	if (v >= qArray[i]) {
+	  tmp = i;
+	}
   }
   
   return tmp;

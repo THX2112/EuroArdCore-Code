@@ -11,8 +11,8 @@
 //        run this example program. Here are the steps:
 //
 //        1. Connect the OUT jack to an oscillator.
-//        2. With the A0 knob all the way down, tune the oscillator.
-//        3. Turn the A0 knob, adjust the ArdCore trimmer until the
+//        X2. With the A0 knob all the way down, tune the oscillator.
+//        X3. Turn the A0 knob, adjust the ArdCore trimmer until the
 //              octaves are as close to tunes as possible.
 //        4. Put a clock source into the CLK jack.
 //        5. Verify that the D0 LED is flashing, and the D0 jack
@@ -65,13 +65,20 @@
 //
 //  ================= start of global section ==================
 
+#include <SPI.h>
+#include <DAC_MCP49xx.h>
+DAC_MCP49xx dac(DAC_MCP49xx::MCP4922, 10); // DAC model, SS pin, LDAC pin
+
 //  constants related to the Arduino Nano pin use
 const int clkIn = 2;           // the digital (clock) input
 const int digPin[2] = {3, 4};  // the digital output pins
 const int pinOffset = 5;       // the first DAC pin (from 5-12)
 const int trigTime = 25;       // 25 ms trigger timing
 
-const int oct[6] = {0, 48, 96, 144, 192, 240}; // the six octave values
+//const int oct[6] = {0, 48, 96, 144, 192, 240}; // the six octave values
+
+// the six octave values converted to 12-bits. 4095/5*voct.
+const int oct[6] = { 0, 819, 1638, 2457, 3276, 4095 };
 
 //  variables for interrupt handling of the clock input
 volatile int clkState = LOW;
@@ -89,28 +96,30 @@ unsigned long digMilli[2] = {0, 0};  // a place to store millis()
 //  lead to damaging the Arduino hardware, or at the very least
 //  cause your program to be unstable.
 
-void setup() 
+void setup()
 {
+	dac.setBuffer(true);
+	dac.setPortWrite(true); //Faster analog outs, but loses pin 7.
 
   // if you need to send data back to your computer, you need
   // to open the serial device. Otherwise, comment this line out.
   Serial.begin(9600);
-  
+
   // set up the digital (clock) input
   pinMode(clkIn, INPUT);
-  
+
   // set up the digital outputs
   for (int i=0; i<2; i++) {
 	pinMode(digPin[i], OUTPUT);
 	digitalWrite(digPin[i], LOW);
   }
-  
+
   // set up the 8-bit DAC output pins
-  for (int i=0; i<8; i++) {
-	pinMode(pinOffset+i, OUTPUT);
-	digitalWrite(pinOffset+i, LOW);
-  }
-  
+  //for (int i=0; i<8; i++) {
+	//pinMode(pinOffset+i, OUTPUT);
+	//digitalWrite(pinOffset+i, LOW);
+  //}
+
   // set up an interrupt handler for the clock in. If you
   // aren't going to use clock input, you should probably
   // comment out this call.
@@ -119,16 +128,16 @@ void setup()
 }
 
 
-void loop() 
+void loop()
 {
   // check to see if the clock as been set
   if (clkState == HIGH) {
 	clkState = LOW;
-	
+
 	digState[0] = HIGH;
 	digMilli[0] = millis();
 	digitalWrite(digPin[0], HIGH);
-	
+
 	clkDivide++;
 	if (clkDivide > (analogRead(1) >> 6)) {
 	  clkDivide = 0;
@@ -137,11 +146,13 @@ void loop()
 	  digitalWrite(digPin[1], HIGH);
 	}
   }
-	
+
   // output the current analog knob 0 setting as an octave voltage
-  int tempOct = analogRead(0) / 171;  // (Gets you 0-6)
-  dacOutput(oct[tempOct]);
-  
+  int tempOctA = analogRead(0) / 171;  // (Gets you 0-6)
+  int tempOctB = analogRead(2) / 171;  // (Gets you 0-6)
+  //dacOutput(oct[tempOct]);
+  dac.outputA(oct[tempOctA]);
+  dac.outputB(oct[tempOctB]);
   // do we have to turn off any of the digital outputs?
   for (int i=0; i<2; i++) {
 	if ((digState[i] == HIGH) && (millis() - digMilli[i] > trigTime)) {
@@ -149,7 +160,7 @@ void loop()
 	  digitalWrite(digPin[i], LOW);
 	}
   }
-  
+
   // print the analog input values
   Serial.print(analogRead(0));   // print the A2 input
   Serial.print('\t');            // print a tab character
@@ -181,7 +192,7 @@ void isr()
 
 //  dacOutput(long) - deal with the DAC output
 //  ------------------------------------------
-void dacOutput(byte v)
+void dacOutput(int v)
 {
 	/*
   // feed this routine a value between 0 and 255 and teh DAC
@@ -192,12 +203,16 @@ void dacOutput(byte v)
 	tmpVal = tmpVal >> 1;
   }
   */
-  
+
   // replacement routine as suggested by Alphonso Alba
   // this code accomplishes the same thing as the original
   // code from above, but is approx 4x faster
-  PORTB = (PORTB & B11100000) | (v >> 3);
-	PORTD = (PORTD & B00011111) | ((v & B00000111) << 5);
+ // PORTB = (PORTB & B11100000) | (v >> 3);
+	//PORTD = (PORTD & B00011111) | ((v & B00000111) << 5);
+
+	//short out = (v * 16);	//	Scale 8 bits to 12 bits.
+	//dac.outputA(out);
+	dac.outputA(v);
 }
 
 //  deJitter(int, int) - smooth jitter input

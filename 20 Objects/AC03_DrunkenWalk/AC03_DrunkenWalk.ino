@@ -74,19 +74,19 @@ int interval = 10;             // the last interval value
 void setup() {
   // set up the digital (clock) input
   pinMode(clkIn, INPUT);
-  
+
   // set up the digital outputs
   for (int i=0; i<2; i++) {
-    pinMode(digPin[i], OUTPUT);
-    digitalWrite(digPin[i], LOW);
+	pinMode(digPin[i], OUTPUT);
+	digitalWrite(digPin[i], LOW);
   }
-  
+
   // set up the 8-bit DAC output pins
   for (int i=0; i<8; i++) {
-    pinMode(pinOffset+i, OUTPUT);
-    digitalWrite(pinOffset+i, LOW);
+	pinMode(pinOffset+i, OUTPUT);
+	digitalWrite(pinOffset+i, LOW);
   }
-  
+
   // set up clock interrupt
   attachInterrupt(0, isr, RISING);
 }
@@ -97,53 +97,53 @@ void loop()
 {
   // service a clock trigger
   if (clkState == HIGH) {
-    clkState = LOW;
-    doStep = 1;
+	clkState = LOW;
+	doStep = 1;
   }
-  
+
   // test for a timer hit (no timer if too low)
   interval = ((1023 - analogRead(0)) >> 4) * 20;
   if ((interval < 1200) && ((millis() - prevMillis) > interval)) {
-    prevMillis = millis();
-    doStep = 1;
+	prevMillis = millis();
+	doStep = 1;
   }
-  
+
   // do the random walk step
   if (doStep) {
-    doStep = 0;
-    int tmpOut = outValue + (analogRead(2) >> 2);
-    if (tmpOut > 255)
-      tmpOut = 256 - (tmpOut - 255);
-    dacOutput(tmpOut);
-    
-    digitalWrite(digPin[0], HIGH);
-    digState[0] = HIGH;
-    digMilli[0] = millis();
-    
-    // get the value jump
-    randVal = ((analogRead(1) >> 6) * 2) + 3;
-    
-    // calculate the next value
-    int newVal = outValue;
-    if (analogRead(3) < 511) {
-      while (newVal == outValue)
-        newVal = outValue + random(randVal) - (randVal / 2);
-    } else {
-      newVal = outValue + random(randVal) - (randVal / 2);
-    }
-    outValue = newVal;
-  
-    // keep in in 8-bit range
-    if (outValue > 255)
-      outValue = 256 - (outValue - 255);
-    if (outValue < 0)
-      outValue = 0 - outValue;
+	doStep = 0;
+	int tmpOut = outValue + (analogRead(2) >> 2);
+	if (tmpOut > 255)
+	  tmpOut = 256 - (tmpOut - 255);
+	dacOutput(tmpOut);
+
+	digitalWrite(digPin[0], HIGH);
+	digState[0] = HIGH;
+	digMilli[0] = millis();
+
+	// get the value jump
+	randVal = ((analogRead(1) >> 6) * 2) + 3;
+
+	// calculate the next value
+	int newVal = outValue;
+	if (analogRead(3) < 511) {
+	  while (newVal == outValue)
+		newVal = outValue + random(randVal) - (randVal / 2);
+	} else {
+	  newVal = outValue + random(randVal) - (randVal / 2);
+	}
+	outValue = newVal;
+
+	// keep in in 8-bit range
+	if (outValue > 255)
+	  outValue = 256 - (outValue - 255);
+	if (outValue < 0)
+	  outValue = 0 - outValue;
   }
-  
+
   // test for trigger turnoff
   if ((digState[0] == HIGH) && (millis() - digMilli[0] > trigTime)) {
-    digitalWrite(digPin[0], LOW);
-    digState[0] = LOW;
+	digitalWrite(digPin[0], LOW);
+	digState[0] = LOW;
   }
 }
 
